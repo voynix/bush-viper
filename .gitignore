@@ -1,0 +1,13 @@
+# PyCharm
+.idea
+
+# virtualenv
+bvenv
+
+# python byproducts
+*.pyc
+*.pyo
+
+# secrets
+.bush_viper
+secret_key
