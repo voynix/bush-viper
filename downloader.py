@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 
 from api import *
 
@@ -6,7 +7,8 @@ DATABASE_PATH = os.path.join(os.getcwd(), 'scrape.sql')
 METADATA_TABLE = 'metadata'
 POSTS_TABLE = 'posts'
 
-class DBAdapter:
+
+class DBAdapter(object):
     """
     A wrapper around sqlite
     """
@@ -116,14 +118,9 @@ def process_post(post, db):
 
 
 if __name__ == '__main__':
-    if not os.path.exists(JSON_PATH):
-        tokens = get_token()
-    else:
-        with open(JSON_PATH, 'r') as token_file:
-            tokens = json.load(token_file)
     with DBAdapter() as db:
-        requester = TumblrRequester(**tokens)
-        posts = requester.get_posts('staff.tumblr.com')
+        requester = TumblrRequester()
+        posts = requester.get_posts(sys.argv[1])
         if posts is not None:
             for post in posts['posts']:
                 process_post(post, db)
