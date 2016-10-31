@@ -82,6 +82,8 @@ class TumblrRequester(object):
         """
         Gets posts from the indicated blog.
 
+        get_posts() attempts to retrieve 20 posts from the indicated blog. (20 is the most allowed by the tumblr API.)
+
         :param blog: the URL of the blog to get
         :param offset: which post to start at
         :return: a dict of the posts or None if the request failed
