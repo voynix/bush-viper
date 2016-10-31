@@ -4,10 +4,6 @@ import os.path
 import urllib
 import urllib2
 
-import oauth2 as oauth
-from httplib2 import RedirectLimit
-
-
 API_URL = 'https://api.tumblr.com/v2/'
 
 JSON_PATH = os.path.join(os.getcwd(), ".bush_viper")
@@ -24,7 +20,8 @@ class TumblrRequester(object):
 
     __version = '0.1.0'
 
-    def __init__(self, host=API_URL):
+    def __init__(self, db, host=API_URL):
+        self.db = db
         self.host = host
         self.headers = {
             'User-Agent': 'bush-viper/' + self.__version
@@ -96,6 +93,77 @@ class TumblrRequester(object):
             print 'Failed to get posts: %s' % results['error']
             return None
         else:
-            print 'Got posts %i to %i out of %i (%s)' % (offset, offset+len(results['posts'])-1, results['total_posts'],
-                                                         blog)
+            print 'Retrieved posts %i to %i out of %i (%s)' % (offset, offset+len(results['posts'])-1,
+                                                               results['total_posts'], blog)
             return results
+
+    def process_post(self, post):
+        """
+        Extracts the relevant data from a post and stores it in the database.
+
+        Post must be a dict as returned by TumblrRequester.get_posts().
+
+        Posts may contain a variety of type-specific data. For unified handling this data is dumped to JSON and stored in the 'aux' field of the post.
+
+        Tags are merged from an array into a comma (',') delimited string. (Commas are not allowed in tags, so individual tags can be recovered later.)
+
+        :param post: the post to process
+        :return: None
+        """
+
+        print 'Processing %s post %i' % (post['type'], post['id'])
+
+        post['tags'] = ','.join(post['tags'])
+        post['source_url'] = None if 'source_url' not in post else post['source_url']
+        post['source_title'] = None if 'source_title' not in post else post['source_title']
+
+        if post['type'] == 'text':
+            post['aux'] = json.dumps({'title': post['title'], 'body': post['body']})
+        elif post['type'] == 'quote':
+            post['aux'] = json.dumps({'text': post['text'], 'source': post['source']})
+        elif post['type'] == 'link':
+            post['aux'] = json.dumps(
+                {'title': post['title'], 'url': post['url'], 'author': post['link_author'], 'excerpt': post['excerpt'],
+                 'publisher': post['publisher'], 'photos': post['photos'], 'description': post['description']})
+        elif post['type'] == 'answer':
+            post['aux'] = json.dumps(
+                {'asking_name': post['asking_name'], 'asking_url': post['asking_url'], 'question': post['question'],
+                 'answer': post['answer']})
+        elif post['type'] == 'video':
+            post['aux'] = json.dumps({'caption': post['caption'], 'player': post['player']})
+        elif post['type'] == 'audio':
+            post['aux'] = json.dumps({'caption': post['caption'], 'player': post['player'], 'plays': post['plays']})
+        elif post['type'] == 'chat':
+            post['aux'] = json.dumps({'title': post['title'], 'dialogue': post['dialogue']})
+        elif post['type'] == 'photo':
+            post['aux'] = json.dumps({'photos': post['photos'], 'caption': post['caption']})
+
+        self.db.insert_post(post)
+
+    def get_blog(self, blog, limit=None):
+        """
+        Retrieves posts from a blog and stores them in the database.
+
+        Posts are retrieved starting from offset 0, the most recent post in the blog.
+
+        :param blog: the URL of the blog to retreive posts from
+        :param limit: how many posts to download; if `None`, unlimited
+        :return: None
+        """
+        print 'Retrieving %s posts from %s' % (str(limit) if limit is not None else 'unlimited', blog)
+
+        posts_processed = 0
+        done = False
+
+        while not done:
+            posts_processed_prev = posts_processed
+            posts = self.get_posts(blog, offset=posts_processed)
+            if posts is not None:
+                for post in posts['posts']:
+                    posts_processed += 1
+                    self.process_post(post)
+                    if (limit is None and posts_processed == posts_processed_prev) or posts_processed == limit:
+                        done = True
+                        break
+
+        print 'Successfully retreived %i posts from %s' % (posts_processed, blog)
