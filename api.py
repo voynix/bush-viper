@@ -1,8 +1,8 @@
-import urllib
-import urlparse
 import json
 import os
 import os.path
+import urllib
+import urlparse
 
 import oauth2 as oauth
 from httplib2 import RedirectLimit
@@ -19,6 +19,7 @@ with open(os.path.join(os.getcwd(), "secret_key")) as key_file:
     secrets = json.load(key_file)
     CONSUMER_KEY = secrets['consumer_key']
     CONSUMER_SECRET = secrets['consumer_secret']
+
 
 class TumblrRequester(object):
     """
@@ -44,6 +45,8 @@ class TumblrRequester(object):
         """
         if params is None:
             params = {'api_key': CONSUMER_KEY}
+        else:
+            params['api_key'] = CONSUMER_KEY
 
         url = self.host + url
         url = url + "?" + urllib.urlencode(params)
@@ -77,15 +80,21 @@ class TumblrRequester(object):
         else:
             return data
 
-    def get_posts(self, blog):
+    def get_posts(self, blog, offset=0):
         """
         Gets posts from the indicated blog.
 
         :param blog: the URL of the blog to get
-        :return: a dict of the posts
+        :param offset: which post to start at
+        :return: a dict of the posts or None if the request failed
         """
-        results = self.get('blog/%s/info' % blog)
-        print results
+        results = self.get('blog/%s/posts' % blog, {'offset': offset, 'limit': 20})
+        if 'meta' in results:
+            print 'Failed to get posts: %s' % results['error']
+            return None
+        else:
+            print 'Got %i posts out of %i' % (len(results['posts']), results['total_posts'])
+            return results
 
 
 def get_token():
