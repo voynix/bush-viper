@@ -4,6 +4,8 @@ import os.path
 import urllib
 import urllib2
 
+import threadpool
+
 API_URL = 'https://api.tumblr.com/v2/'
 
 JSON_PATH = os.path.join(os.getcwd(), ".bush_viper")
@@ -26,6 +28,7 @@ class TumblrRequester(object):
         self.headers = {
             'User-Agent': 'bush-viper/' + self.__version
         }
+        self.threadpool = threadpool.ThreadPool()
 
     def get(self, url, params=None):
         """
@@ -90,7 +93,7 @@ class TumblrRequester(object):
             print 'Failed to get posts: catastrophic HTTP error'
             return None
         if 'meta' in results:  # application-level error from tumblr
-            print 'Failed to get posts: %s' % results['error']
+            print 'Failed to get posts: %s' % results['response']['error']
             return None
         else:
             print 'Retrieved posts %i to %i out of %i (%s)' % (offset, offset+len(results['posts'])-1,
@@ -125,6 +128,8 @@ class TumblrRequester(object):
             post['aux'] = json.dumps(
                 {'title': post['title'], 'url': post['url'], 'author': post['link_author'], 'excerpt': post['excerpt'],
                  'publisher': post['publisher'], 'photos': post['photos'], 'description': post['description']})
+            for photo in post['photos']:
+                self.threadpool.insert(photo['original_size']['url'])
         elif post['type'] == 'answer':
             post['aux'] = json.dumps(
                 {'asking_name': post['asking_name'], 'asking_url': post['asking_url'], 'question': post['question'],
@@ -137,6 +142,17 @@ class TumblrRequester(object):
             post['aux'] = json.dumps({'title': post['title'], 'dialogue': post['dialogue']})
         elif post['type'] == 'photo':
             post['aux'] = json.dumps({'photos': post['photos'], 'caption': post['caption']})
+            for photo in post['photos']:
+                max_alt = 0
+                url = ''
+                for alt in photo['alt_sizes']:
+                    # make sure we get the largest available size
+                    # tumblr seems to always put that first, but I'd rather not trust the API
+                    #  any farther than I have to
+                    if alt['width'] + alt['height'] > max_alt:
+                        url = alt['url']
+                        max_alt = alt['width'] + alt['height']
+                self.threadpool.insert(url)
 
         self.db.insert_post(post)
 
