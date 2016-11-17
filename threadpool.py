@@ -1,5 +1,6 @@
 import os
 import os.path
+import re
 import threading
 import urllib2
 import Queue
@@ -8,6 +9,9 @@ CHUNK_SIZE = 16384  # 16 KB, chosen randomly
 
 OUTFILE_FOLDER = 'images'
 OUTFILE_PATTERN = os.path.join(OUTFILE_FOLDER, '%s')
+
+TUMBLR_IMAGE_REGEX = r'https://\d+\.media\.tumblr\.com/\w+/(\w+\.\w{3})'
+
 
 class ThreadPool(object):
     """
@@ -63,12 +67,16 @@ def download_images(queue, id):
     while True:
         url = queue.get()
         try:
+            outfile_path = OUTFILE_PATTERN % url.split('/')[-1]  # this is super janky
+            if os.path.exists(outfile_path):
+                print '%s has already been downloaded to %s; thread %i moving on' % (url, outfile_path, id)
+                # we don't need to call task_done() here since the finally clause takes care of it for us
+                continue
             response = urllib2.urlopen(url)
             if response.getcode() not in [200, 201, 301]:
-                print 'Failed to retrieve %s with error code %i' % (url, response.getcode())
+                print 'Thread %i failed to retrieve %s with HTTP status %i' % (id, url, response.getcode())
                 queue.task_done()
                 continue
-            outfile_path = OUTFILE_PATTERN % url.split('/')[-1]  # this is super janky
             print 'Thread %i now downloading %s to %s' % (id, url, outfile_path)
             with open(outfile_path, 'w') as outfile:
                 while True:
@@ -82,3 +90,26 @@ def download_images(queue, id):
             print 'Failure in thread %i: %s' % (id, repr(e))
         finally:
             queue.task_done()
+
+
+def rewrite_url(url):
+    """
+    Rewrites a URL that points to an extarnal image to point to a bush-viper-downloaded local image
+    :param url: the URL to rewrite
+    :return: the rewritten URL
+    """
+
+    new_url = os.path.join(OUTFILE_FOLDER, url.split('/')[-1])
+    print 'Rewrote %s to %s' % (url, new_url)
+    return new_url
+
+
+def replace_urls(text):
+    """
+    Finds URLs of images hosted on tumblr and replaces them with local URLs
+
+    :param text: the text to replace URLs in
+    :return: the text, with tumblr image URLs rewritten
+    """
+    new_url = rewrite_url(r'./\1')
+    return re.sub(TUMBLR_IMAGE_REGEX, text, new_url)

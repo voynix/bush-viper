@@ -1,6 +1,6 @@
 import json
-import os
 import os.path
+import re
 import urllib
 import urllib2
 
@@ -121,15 +121,17 @@ class TumblrRequester(object):
         post['source_title'] = None if 'source_title' not in post else post['source_title']
 
         if post['type'] == 'text':
-            post['aux'] = json.dumps({'title': post['title'], 'body': post['body']})
+            post['aux'] = json.dumps({'title': post['title'], 'body': threadpool.replace_urls(post['body'])})
         elif post['type'] == 'quote':
             post['aux'] = json.dumps({'text': post['text'], 'source': post['source']})
         elif post['type'] == 'link':
+            for photo in post['photos']:
+                self.threadpool.insert(photo['original_size']['url'])
+                photo['bv'] = {'url': threadpool.rewrite_url(photo['original_size']['url']),
+                               'width': photo['original_size']['width'], 'height': photo['original_size']['height']}
             post['aux'] = json.dumps(
                 {'title': post['title'], 'url': post['url'], 'author': post['link_author'], 'excerpt': post['excerpt'],
                  'publisher': post['publisher'], 'photos': post['photos'], 'description': post['description']})
-            for photo in post['photos']:
-                self.threadpool.insert(photo['original_size']['url'])
         elif post['type'] == 'answer':
             post['aux'] = json.dumps(
                 {'asking_name': post['asking_name'], 'asking_url': post['asking_url'], 'question': post['question'],
@@ -141,18 +143,21 @@ class TumblrRequester(object):
         elif post['type'] == 'chat':
             post['aux'] = json.dumps({'title': post['title'], 'dialogue': post['dialogue']})
         elif post['type'] == 'photo':
-            post['aux'] = json.dumps({'photos': post['photos'], 'caption': post['caption']})
             for photo in post['photos']:
-                max_alt = 0
+                max_width = 0
+                max_height = 0
                 url = ''
                 for alt in photo['alt_sizes']:
                     # make sure we get the largest available size
                     # tumblr seems to always put that first, but I'd rather not trust the API
                     #  any farther than I have to
-                    if alt['width'] + alt['height'] > max_alt:
+                    if alt['width'] + alt['height'] > max_width + max_height:
                         url = alt['url']
-                        max_alt = alt['width'] + alt['height']
+                        max_width = alt['width']
+                        max_height = alt['height']
                 self.threadpool.insert(url)
+                photo['bv'] = {'url': threadpool.rewrite_url(url), 'width': max_width, 'height': max_height}
+            post['aux'] = json.dumps({'photos': post['photos'], 'caption': post['caption']})
 
         self.db.insert_post(post)
 
