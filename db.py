@@ -73,3 +73,13 @@ class DBAdapter(object):
                   post['source_title'], post['state'], post['aux'])
         self.curs.execute(command, values)
         self.conn.commit()
+
+    def get_all_posts(self):
+        """
+        Generates all posts stored in the database.
+
+        :return: each post in the database as a tuple of its columns
+        """
+        command = u'SELECT * FROM %s' % POSTS_TABLE
+        for post in self.curs.execute(command):
+            yield post
