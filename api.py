@@ -121,25 +121,28 @@ class TumblrRequester(object):
         post['source_title'] = None if 'source_title' not in post else post['source_title']
 
         if post['type'] == 'text':
-            post['aux'] = json.dumps({'title': post['title'], 'body': threadpool.replace_urls(post['body'])})
+            post['aux'] = json.dumps({'title': post['title'], 'body': self.threadpool.replace_urls(post['body'])})
         elif post['type'] == 'quote':
-            post['aux'] = json.dumps({'text': post['text'], 'source': post['source']})
+            post['aux'] = json.dumps({'text': self.threadpool.replace_urls(post['text']), 'source': post['source']})
         elif post['type'] == 'link':
             for photo in post['photos']:
                 self.threadpool.insert(photo['original_size']['url'])
-                photo['bv'] = {'url': threadpool.rewrite_url(photo['original_size']['url']),
+                photo['bv'] = {'url': self.threadpool.rewrite_and_download_url(photo['original_size']['url']),
                                'width': photo['original_size']['width'], 'height': photo['original_size']['height']}
             post['aux'] = json.dumps(
                 {'title': post['title'], 'url': post['url'], 'author': post['link_author'], 'excerpt': post['excerpt'],
-                 'publisher': post['publisher'], 'photos': post['photos'], 'description': post['description']})
+                 'publisher': post['publisher'], 'photos': post['photos'],
+                 'description': self.threadpool.replace_urls(post['description'])})
         elif post['type'] == 'answer':
             post['aux'] = json.dumps(
                 {'asking_name': post['asking_name'], 'asking_url': post['asking_url'], 'question': post['question'],
-                 'answer': post['answer']})
+                 'answer': self.threadpool.replace_urls(post['answer'])})
         elif post['type'] == 'video':
-            post['aux'] = json.dumps({'caption': post['caption'], 'player': post['player']})
+            post['aux'] = json.dumps({'caption': self.threadpool.replace_urls(post['caption']),
+                                      'player': post['player']})
         elif post['type'] == 'audio':
-            post['aux'] = json.dumps({'caption': post['caption'], 'player': post['player'], 'plays': post['plays']})
+            post['aux'] = json.dumps({'caption': self.threadpool.replace_urls(post['caption']),
+                                      'player': post['player'], 'plays': post['plays']})
         elif post['type'] == 'chat':
             post['aux'] = json.dumps({'title': post['title'], 'dialogue': post['dialogue']})
         elif post['type'] == 'photo':
@@ -156,8 +159,10 @@ class TumblrRequester(object):
                         max_width = alt['width']
                         max_height = alt['height']
                 self.threadpool.insert(url)
-                photo['bv'] = {'url': threadpool.rewrite_url(url), 'width': max_width, 'height': max_height}
-            post['aux'] = json.dumps({'photos': post['photos'], 'caption': post['caption']})
+                photo['bv'] = {'url': self.threadpool.rewrite_and_download_url(url), 'width': max_width,
+                               'height': max_height}
+            post['aux'] = json.dumps({'photos': post['photos'],
+                                      'caption': self.threadpool.replace_urls(post['caption'])})
 
         self.db.insert_post(post)
 
