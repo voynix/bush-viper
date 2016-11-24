@@ -16,9 +16,9 @@ class Renderer(object):
     Dumps downloaded posts from the database to HTML files
     """
 
-    def __init__(self, db, blog_name):
+    def __init__(self, db):
         self.db = db
-        self.blog_name = blog_name  # TODO: dump this into db and retrieve it here
+        self.blog_title, self.blog_url = self.db.get_metadata()
 
     def dump_posts(self):
         print 'Checking for %s' % OUTFILE_FOLDER
@@ -31,7 +31,7 @@ class Renderer(object):
             outfile_name = OUTFILE_PATTERN % post_id
             with codecs.open(outfile_name, 'w', encoding='utf-8') as outfile:
                 print 'Dumping %s post %i to %s' % (post_type, post_id, outfile_name)
-                outfile.write(HEADER % self.blog_name)
+                outfile.write(HEADER % self.blog_title)
                 if post_type == 'text':
                     outfile.write('<h2>%s<h2>\n%s' % (aux_info['title'], aux_info['body']))
                 elif post_type == 'photo':

@@ -78,13 +78,28 @@ class TumblrRequester(object):
         else:
             return data
 
+    def get_metadata(self, blog):
+        """
+        Get metadata for the indicated blog and store it in the database.
+        :param blog: the URL for the blog
+        :return:
+        """
+        metadata = self.get('blog/%s/info' % blog)
+        if metadata is None:  # HTTP error from get()
+            print 'Failed to get metadata; catastrophic HTTP error'
+        elif 'meta' in metadata:  # application-level error from tumblr
+            print 'Failed to get metadata: %s' % metadata['response']['error']
+        else:
+            print 'Got metadata for %s' % blog
+            self.db.insert_metadata(blog, metadata['blog']['title'], metadata['blog']['updated'])
+
     def get_posts(self, blog, offset=0):
         """
         Gets posts from the indicated blog.
 
         get_posts() attempts to retrieve 20 posts from the indicated blog. (20 is the most allowed by the tumblr API.)
 
-        :param blog: the URL of the blog to get
+        :param blog: the URL of the blog to get posts for
         :param offset: which post to start at
         :return: a dict of the posts or None if the request failed
         """
@@ -92,7 +107,7 @@ class TumblrRequester(object):
         if results is None:  # HTTP error from get()
             print 'Failed to get posts: catastrophic HTTP error'
             return None
-        if 'meta' in results:  # application-level error from tumblr
+        elif 'meta' in results:  # application-level error from tumblr
             print 'Failed to get posts: %s' % results['response']['error']
             return None
         else:
@@ -176,6 +191,8 @@ class TumblrRequester(object):
         :param limit: how many posts to download; if `None`, unlimited
         :return: None
         """
+        self.get_metadata(blog)
+
         print 'Retrieving %s posts from %s' % (str(limit) if limit is not None else 'unlimited', blog)
 
         posts_processed = 0

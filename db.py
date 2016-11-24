@@ -61,6 +61,29 @@ class DBAdapter(object):
                              tags TEXT, source_url TEXT, source_title TEXT, state TEXT, aux_info TEXT)''' % POSTS_TABLE)
         self.conn.commit()
 
+    def insert_metadata(self, url, title, last_update):
+        """
+        Insert metadata for a blog into the database.
+
+        :param url: the URL for the blog
+        :param title: the title of the blog
+        :param last_update: when the blog was last updated
+        :return: None
+        """
+        command = u'INSERT INTO %s VALUES (?, ?, ?)' % METADATA_TABLE
+        self.curs.execute(command, (url, title, last_update))
+        self.conn.commit()
+
+    def get_metadata(self):
+        """
+        Get the most recent metadata for the blog stored in the database.
+
+        :return: a tuple of blog title and URL
+        """
+        command = u'SELECT title, url FROM %s ORDER BY last_update DESC' % METADATA_TABLE
+        for row in self.curs.execute(command):
+            return row
+
     def insert_post(self, post):
         """
         Stores a post in the database.

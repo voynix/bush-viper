@@ -8,7 +8,7 @@ from renderer import *
 if __name__ == '__main__':
     with DBAdapter() as db:
         if sys.argv[1] == 'render':
-            renderer = Renderer(db, 'blog_name')
+            renderer = Renderer(db)
             renderer.dump_posts()
         else:
             requester = TumblrRequester(db)
