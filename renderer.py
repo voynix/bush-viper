@@ -3,7 +3,6 @@ import json
 import os
 import os.path
 
-from db import DBAdapter
 from threadpool import OUTFILE_FOLDER as IMAGE_FOLDER
 
 HEADER = '<html>\n<head>\n<meta charset="UTF-8">\n<title>%s</title>\n</head>\n<body>\n'
@@ -59,8 +58,3 @@ class Renderer(object):
                 else:
                     print 'Skipping %s post %i' % (post_type, post_id)
                 outfile.write(FOOTER)
-
-if __name__ == '__main__':
-    with DBAdapter() as dba:
-        renderer = Renderer(dba, 'blog_name')
-        renderer.dump_posts()
