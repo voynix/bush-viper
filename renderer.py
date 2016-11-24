@@ -3,8 +3,6 @@ import json
 import os
 import os.path
 
-from threadpool import OUTFILE_FOLDER as IMAGE_FOLDER
-
 HEADER = '<html>\n<head>\n<meta charset="UTF-8">\n<title>%s</title>\n</head>\n<body>\n'
 # TODO: source attribution block for posts with sources
 FOOTER = '\n</body>\n</html>'
@@ -25,15 +23,8 @@ class Renderer(object):
     def dump_posts(self):
         print 'Checking for %s' % OUTFILE_FOLDER
         if not os.path.exists(OUTFILE_FOLDER):
-            print 'Creating %s' % OUTFILE_FOLDER
-            os.mkdir(OUTFILE_FOLDER)
-        print 'Checking for %s' % IMAGE_FOLDER
-        if not os.path.exists(os.path.join(OUTFILE_FOLDER, IMAGE_FOLDER)):
-            if not os.path.exists(IMAGE_FOLDER):
-                print '%s not found; exiting' % IMAGE_FOLDER
-                exit(1)
-            print 'Moving %s inside %s' % (IMAGE_FOLDER, OUTFILE_FOLDER)
-            os.rename(IMAGE_FOLDER, os.path.join(OUTFILE_FOLDER, IMAGE_FOLDER))
+            print '%s not found; exiting' % OUTFILE_FOLDER
+            exit(1)
         for post in self.db.get_all_posts():
             post_id, post_type, time, date, tags, source_url, source_title, state, aux_info = post
             aux_info = json.loads(aux_info)

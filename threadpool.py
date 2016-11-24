@@ -5,10 +5,12 @@ import threading
 import urllib2
 import Queue
 
+from renderer import OUTFILE_FOLDER as POSTS_FOLDER
+
 CHUNK_SIZE = 16384  # 16 KB, chosen randomly
 
 OUTFILE_FOLDER = 'images'
-OUTFILE_PATTERN = os.path.join(OUTFILE_FOLDER, '%s')
+OUTFILE_PATTERN = os.path.join(POSTS_FOLDER, OUTFILE_FOLDER, '%s')
 
 TUMBLR_IMAGE_REGEX = r'https://\d+\.media\.tumblr\.com/\w+/\w+\.\w{3}'
 
@@ -19,10 +21,14 @@ class ThreadPool(object):
     """
 
     def __init__(self, num_threads=5):
+        print 'Checking for %s' % POSTS_FOLDER
+        if not os.path.exists(POSTS_FOLDER):
+            print 'Creating %s' % POSTS_FOLDER
+            os.mkdir(POSTS_FOLDER)
         print 'Checking for %s' % OUTFILE_FOLDER
-        if not os.path.exists(OUTFILE_FOLDER):
+        if not os.path.exists(os.path.join(POSTS_FOLDER, OUTFILE_FOLDER)):
             print 'Creating %s' % OUTFILE_FOLDER
-            os.mkdir(OUTFILE_FOLDER)
+            os.mkdir(os.path.join(POSTS_FOLDER, OUTFILE_FOLDER))
         self.queue = Queue.Queue()
         self.threads = []
         for x in xrange(0, num_threads):
