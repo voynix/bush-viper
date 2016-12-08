@@ -84,6 +84,16 @@ class DBAdapter(object):
         for row in self.curs.execute(command):
             return row
 
+    def post_id_exists(self, post_id):
+        """
+        Check if a post with the given id is already in the database
+
+        :param post_id: the post id to check
+        :return: whether or not a post with the given id is in the database
+        """
+        command = u'SELECT * FROM %s WHERE id=%i' % (POSTS_TABLE, post_id)
+        return len(self.curs.execute(command)) > 0
+
     def insert_post(self, post):
         """
         Stores a post in the database.

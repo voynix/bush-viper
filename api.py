@@ -1,12 +1,12 @@
 import json
 import os.path
-import re
 import urllib
 import urllib2
 
 import threadpool
 
 API_URL = 'https://api.tumblr.com/v2/'
+API_POST_LIMIT = 20
 
 JSON_PATH = os.path.join(os.getcwd(), ".bush_viper")
 
@@ -81,6 +81,7 @@ class TumblrRequester(object):
     def get_metadata(self, blog):
         """
         Get metadata for the indicated blog and store it in the database.
+
         :param blog: the URL for the blog
         :return:
         """
@@ -97,13 +98,13 @@ class TumblrRequester(object):
         """
         Gets posts from the indicated blog.
 
-        get_posts() attempts to retrieve 20 posts from the indicated blog. (20 is the most allowed by the tumblr API.)
+        get_posts() attempts to retrieve API_POST_LIMIT posts from the indicated blog.
 
         :param blog: the URL of the blog to get posts for
         :param offset: which post to start at
         :return: a dict of the posts or None if the request failed
         """
-        results = self.get('blog/%s/posts' % blog, {'offset': offset, 'limit': 20})
+        results = self.get('blog/%s/posts' % blog, {'offset': offset, 'limit': API_POST_LIMIT})
         if results is None:  # HTTP error from get()
             print 'Failed to get posts: catastrophic HTTP error'
             return None
@@ -141,6 +142,8 @@ class TumblrRequester(object):
             post['aux'] = json.dumps({'text': self.threadpool.replace_urls(post['text']), 'source': post['source']})
         elif post['type'] == 'link':
             for photo in post['photos']:
+                # unlike in photo posts, in link posts photos give their biggest available size in original_size
+                # consistency!
                 self.threadpool.insert(photo['original_size']['url'])
                 photo['bv'] = {'url': self.threadpool.rewrite_and_download_url(photo['original_size']['url']),
                                'width': photo['original_size']['width'], 'height': photo['original_size']['height']}
@@ -167,8 +170,7 @@ class TumblrRequester(object):
                 url = ''
                 for alt in photo['alt_sizes']:
                     # make sure we get the largest available size
-                    # tumblr seems to always put that first, but I'd rather not trust the API
-                    #  any farther than I have to
+                    # tumblr seems to always put that first, but I'd rather not trust the API more than necessary
                     if alt['width'] + alt['height'] > max_width + max_height:
                         url = alt['url']
                         max_width = alt['width']
@@ -196,17 +198,28 @@ class TumblrRequester(object):
         print 'Retrieving %s posts from %s' % (str(limit) if limit is not None else 'unlimited', blog)
 
         posts_processed = 0
+        offset = 0
         done = False
 
         while not done:
-            posts_processed_prev = posts_processed
-            posts = self.get_posts(blog, offset=posts_processed)
+            posts = self.get_posts(blog, offset=offset)
             if posts is not None:
+                if len(posts) == 0:  # we've run off the end of the blog
+                    break
                 for post in posts['posts']:
-                    posts_processed += 1
+                    # tumblr, because tumblr, doesn't do stable pagination
+                    # ie, since we get posts in blocks of 20 at fixed offsets from the most *recent* post
+                    #  if a post is made while we're walking through the blog, the next block will contain a post
+                    #  that was in the previous block, and if we put that in the database we'd violate the
+                    #  uniqueness constraint on post ids
+                    # thus, we do a SQL query to check for duplication before we insert the post into the db
+                    if self.db.post_id_exists(post['id']):
+                        continue
                     self.process_post(post)
-                    if (limit is None and posts_processed == posts_processed_prev) or posts_processed == limit:
+                    posts_processed += 1
+                    if posts_processed == limit:
                         done = True
                         break
+                offset += API_POST_LIMIT
 
         print 'Successfully retreived %i posts from %s' % (posts_processed, blog)
